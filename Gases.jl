@@ -1,11 +1,13 @@
 include("./sampling.jl")
 
-using .MaxwellBoltzmann
-using Unitful
-using Distances
+using .MaxwellBoltzmann, Unitful, Distances, Plots
+
+
+gr()
 
 
 const T = 298u"K"
+const dt = 1
 	
 mutable struct Gas 
 	N :: Int64
@@ -62,55 +64,36 @@ s = Simulation(1000,argon,argon2)
 
 function colisiones!(s:: Simulation, distancia = .1)
 	#la distancia que elegi como prueba de colisiones es random
-	data = [vcat(gas.pos', fill(gas.mass, size(gas.pos)[1])', gas.vel') for gas in s.gases] |> p -> hcat(p...)
-	# En este array la estructura es :
-	# 1 - pos_x
-	# 2 - pos_y
-	# 3 - masa
-	# 4 - vel_x
-	# 5 - vel_y
-	dist = pairwise(Euclidean(), data[begin:2,:], dims=2) |> d -> findall(d .< distancia) 
+	dist = pairwise(Euclidean(), s.pos', dims=2) |> d -> findall(d .< distancia) 
 	colisiones = [index for index in dist if index[1] < index[2] ]# |> c -> getindex.(c, [1 2])
-	map(cls) do cl
-           i,j = (cl[1], cl[2])
-           pos_i, vel_i = data[1:2,i], data[4:5,i] 
-           pos_j, vel_j = data[1:2,j], data[4:5,j]
-           rel_pos, rel_vel = pos_i - pos_j, vel_i - vel_j
-           r_rel = dot(rel_pos, rel_pos)
-           v_rel = dot(rel_vel, rel_pos)
-           v_rel = (2 .* rel_pos .*v_rel)./(r_rel .- rel_vel)
-           v_cm = (vel_i .+ vel_j)./ 2
-           v_rel, v_cm
+	for cl ∈ colisiones
+		i,j = (cl[1], cl[2])
+		pos_i, vel_i = s.pos[i], s.vel[i] 
+		pos_j, vel_j = s.vel[j], s.vel[j]
+		rel_pos, rel_vel = pos_i - pos_j, vel_i - vel_j
+		r_rel = dot(rel_pos, rel_pos)
+		v_rel = dot(rel_vel, rel_pos)
+		v_rel = (2 .* rel_pos .*v_rel)./(r_rel .- rel_vel)
+		v_cm = (vel_i .+ vel_j)./ 2
+		s.vel[i] = v_cm - v_rel/2
+		s.vel[j] = v_cm + v_rel/2
 	end
+
 end
-
-
-function colisiones_(s::Simulation)
-	data = [vcat(gas.pos', fill(gas.mass, size(gas.pos)[1])', gas.vel') for gas in s.gases] |> p -> hcat(p...)
-
-	dist = pairwise(Euclidean(), data[begin:2,:], dims=2) |> d -> findall(d .< .1) 
-	[index for index in dist if index[1] < index[2] ]
-end
-
-function build_data(s::Simulation)
-	[vcat(gas.pos', fill(gas.mass, size(gas.pos)[1])', gas.vel') for gas in s.gases] |> p -> hcat(p...)
-end
-
-
-
-
-
-function solve_colisiones(g::Gas)
-	# Se tiene que tener en cuenta que podria haber colisiones entre distintas particulas que no 
-	# tienen por que ser del mismo gas. Esto implicaria pensar que habria que concatenar de alguna 	      # las posiciones de todas las partículas.
-
-	nothing
-end
-
-
-
 
 function advance_time!(s::Simulation)
-	nothing	
+	s.pos += s.vel * dt
+	colisiones!(s)
+	s.step += dt
 end
 
+p = Plots.plot()
+
+@gif for step in 1:s.steps
+	scatter!(p, s.pos[:,1], s.pos[:,2])
+	advance_time!(s)
+end
+
+
+
+Plots.savefig(p, "grafico.gif")

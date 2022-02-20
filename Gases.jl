@@ -34,7 +34,7 @@ end
 mutable struct Simulation
 	steps :: Int
 	step :: Int
-	#gases :: Union{Gas,Vector{Gas}}
+	gases :: Union{Gas,Vector{Gas}}
 	vel :: Array{Float64}
 	pos :: Array{Float64}
 	mass :: Array{Float64}
@@ -43,7 +43,8 @@ mutable struct Simulation
 		vel = vcat([g.vel for g in gases]...) 
 		pos = vcat([g.pos for g in gases]...) 
 		mass = vcat([fill(g.mass, g.N) for g in gases]...)
-		new(steps,1, vel, pos, mass)
+		gases = [gas for gas in gases]
+		new(steps, 1, gases, vel, pos, mass)
 	end
 end
 
@@ -59,7 +60,7 @@ argon2 = Gas(;N = 100,
 	 T = 298)
 
 
-s = Simulation(1000,argon,argon2)
+s = Simulation(10,argon,argon2)
 
 
 function colisiones!(s:: Simulation, distancia = .1)
@@ -87,13 +88,24 @@ function advance_time!(s::Simulation)
 	s.step += dt
 end
 
-p = Plots.plot()
 
-@gif for step in 1:s.steps
-	scatter!(p, s.pos[:,1], s.pos[:,2])
-	advance_time!(s)
+
+function main(s::Simulation)
+
+	p = Plots.plot(legend=:false)
+
+	@gif for step in 1:s.steps
+		Nᵢ = 1
+		Nₛ = 1
+		cg = cgrad(:acton)
+		for (n,gas) ∈ enumerate(s.gases)
+			Nₛ += size(gas.pos)[1]
+			scatter!(p, s.pos[ Nᵢ:Nₛ ,1], s.pos[ Nᵢ:Nₛ ,2], color = cg[n] )
+			advance_time!(s)
+			Nᵢ += Nₛ
+	end
+
+
+
+	Plots.savefig(p, "grafico")
 end
-
-
-
-Plots.savefig(p, "grafico.gif")

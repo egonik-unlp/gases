@@ -1,3 +1,10 @@
+#  Implementanción en Julia del generador de números aleatorios  
+# desarrollado en el trabajo:
+#  "Efficient Algorithm for Generating Maxwell Random Variables" de Nader M.A. Mohamed
+# 
+# J Stat Phys (2011) 145:1653–1660
+# DOI 10.1007/s10955-011-0364-y
+#
 module MaxwellBoltzmann
 
 export rvs

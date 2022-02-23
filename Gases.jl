@@ -53,7 +53,7 @@ mutable struct Simulation
 end
 
 
-# v(v) = sqrt.(v[:,1].^2 + v[:,2].^2)
+modulo_v(v) = sqrt.(v[:,1].^2 + v[:,2].^2)
 # Eₖ(s::Simulation) = s.mass.*mv(s.vel).^2 |> sum
 
 
@@ -106,13 +106,62 @@ end
 function advance_time!(s::Simulation)
 	s.pos += s.vel * dt
 	colisiones!(s)
-	v(v) = sqrt.(v[:,1].^2 + v[:,2].^2)
-	Eₖ(s::Simulation) = s.mass.*mv(s.vel).^2 |> sum
+
+	# Eₖ(s::Simulation) = s.mass.*mv(s.vel).^2 |> sum
 	# @info "Energía cinética en el paso $(s.step) = $(Eₖ(s))"
 	s.step += 1
 end
 
+
+
+
+function alternate_main(s::Simulation, splits = 4)
+	modv(v) = sqrt.(v[:,1].^2 + v[:,2].^2)
+	filter_v(v,vt) = modv(v) .>= vt[Nᵢ] .&& modv(v) .<= vt[Nₛ]
+
+	anim = @animate for step in 1:s.steps
+		global p = Plots.plot()
+		xlims!(p,0,1)
+		ylims!(p,0,1)
+		cpalette = palette(:tab10, splits)
+		global Nᵢ, Nₛ = 1,0
+		vt = modv(s.vel) |> sort
+		size_of_split = length(vt) ÷ splits
+		resto = length(vt) & splits 	
+		for (i, color) ∈ zip(1:splits, cpalette)
+			Nₛ += size_of_split
+			Nₛ + size_of_split + resto >= length(vt) ? length(vt) : Nₛ
+			global slct = filter_v(s.vel,vt) |> idx -> s.pos[idx,:]
+			if step == 100
+				@info "Ns $Nₛ, Nᵢ $Nᵢ color = $color size of select = $(size(slct))" #debug 
+			end
+			scatter!(p, slct[:,1], slct[:, 2], color = color, label = "cuartil $(4 -i +1 )")
+			Nᵢ = Nₛ + 1
+		end
+
+		advance_time!(s)
+	end
+
+
+
+	gif(anim, "anim.gif", fps= 15)
+
+	Plots.savefig(p, "grafico")
+end
+
+
+
+
+
+
+
+
+
+
+
+
 function main(s::Simulation)
+	
 
 
 	anim = @animate for step in 1:s.steps
@@ -126,6 +175,7 @@ function main(s::Simulation)
 		for (col,gas) ∈ zip(cg, s.gases)
 			Nₛ += size(gas.pos)[1]
 			scatter!(p, s.pos[ Nᵢ:Nₛ ,1], s.pos[ Nᵢ:Nₛ ,2], color = col, label = :false)
+			
 			advance_time!(s) ###Esto no va acá ni en p2
 			# labels!(" $(s.step*dt) s")
 			Nᵢ += Nₛ
@@ -142,4 +192,5 @@ function main(s::Simulation)
 end
 
 
-main(s)
+# main(s) ## En el plot, se representan los distintos gases presentes
+alternate_main(s, 4) ## En el plot, los distintos colores representan los distintos n-iles (por defecto 4) de veolocidad

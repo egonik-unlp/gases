@@ -1,6 +1,6 @@
 include("./sampling.jl")
 
-using .MaxwellBoltzmann, Unitful, Distances, Plots, LinearAlgebra, Distributions
+using .MaxwellBoltzmann, Unitful, Distances, Plots, LinearAlgebra, Distributions, OrderedCollections
 const X, Y = 1,2
 const rscale = 1e-6 # Escala
 const tscale = 1e9 #
@@ -59,7 +59,7 @@ modulo_v(v) = sqrt.(v[:,1].^2 + v[:,2].^2)
 
 
 
-argon = Gas(;N = 100,
+argon = Gas(;N = 40,
 	 radius = 2e-10,
 	 mass = 10^-7,
 	 T = 298,
@@ -72,11 +72,11 @@ argon2 = Gas(;N = 100,
 	 lo = nothing)
 
 
-s = Simulation(1200,argon,argon2)
+s = Simulation(300,argon)
 
 
 function colisiones!(s:: Simulation)
-	distancia = .0001
+	distancia = .1
 	#la distancia que elegi como prueba de colisiones es random
 	dist = pairwise(Euclidean(), s.pos', dims=2) |> d -> findall(d .< distancia) 
 	colisiones = [index for index in dist if index[1] < index[2] ]
@@ -121,6 +121,7 @@ function alternate_main(s::Simulation, splits = 4)
 
 	anim = @animate for step in 1:s.steps
 		global p = Plots.plot()
+		# global h = Plots.plot()
 		xlims!(p,0,1)
 		ylims!(p,0,1)
 		cpalette = palette(:tab10, splits)
@@ -138,18 +139,29 @@ function alternate_main(s::Simulation, splits = 4)
 			scatter!(p, slct[:,1], slct[:, 2], color = color, label = "cuartil $(4 -i +1 )")
 			Nᵢ = Nₛ + 1
 		end
+		# histogram!(h, vt)
+		# plot(p,h, size = (1920, 1080))
 
 		advance_time!(s)
 	end
 
 
 
-	gif(anim, "anim.gif", fps= 15)
+	gif(anim, "anim_doble.gif", fps= 15)
 
 	Plots.savefig(p, "grafico")
 end
 
 
+function blind_main(s::Simulation)
+	storage = OrderedDict()
+	@info "blind run"
+	for step ∈ 1:s.steps
+		advance_time!(s)
+		storage[s.step] = s.pos
+	end
+	storage
+end
 
 
 
@@ -193,4 +205,5 @@ end
 
 
 # main(s) ## En el plot, se representan los distintos gases presentes
-alternate_main(s, 4) ## En el plot, los distintos colores representan los distintos n-iles (por defecto 4) de veolocidad
+# alternate_main(s, 4) ## En el plot, los distintos colores representan los distintos n-iles (por defecto 4) de veolocidad
+str = blind_main(s) 
